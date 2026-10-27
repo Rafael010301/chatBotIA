@@ -2,10 +2,10 @@
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue?style=for-the-badge&logo=python)
 ![CustomTkinter](https://img.shields.io/badge/GUI-CustomTkinter-blueviolet?style=for-the-badge)
-![Google Gemini](https://img.shields.io/badge/AI-Google_Gemini-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![NVIDIA NIM](https://img.shields.io/badge/AI-NVIDIA_NIM-76B900?style=for-the-badge&logo=nvidia)
 
-Aplicação desktop em Python que simula um chatbot inteligente. O projeto inclui login local, troca entre modo claro e escuro, respostas locais para temas de TI e integração com a API do Google Gemini.
+
+Aplicação desktop em Python que simula um chatbot de TI. O projeto inclui login local, troca entre modo claro e escuro, respostas locais para temas básicos e integração com modelos de IA da plataforma NVIDIA NIM.
 
 ---
 
@@ -13,9 +13,9 @@ Aplicação desktop em Python que simula um chatbot inteligente. O projeto inclu
 
 - **Tela de login:** autenticação local com credenciais pré-definidas.
 - **Interface gráfica:** construída com CustomTkinter, com troca de tema (escuro/claro) em tempo real.
-- **Gerenciamento de conversa:** caixa de texto com rolagem automática e botão para limpar o histórico.
-- **Respostas com IA e fallback local:** integração com o modelo Gemini e respostas locais estruturadas para temas de TI quando não há conexão ou a API não está disponível.
-- **Processamento assíncrono:** o módulo `threading` simula o tempo de resposta da IA sem travar a interface.
+- **Gerenciamento de conversa:** caixa de texto com rolagem automática, histórico de contexto e botão para limpar a conversa.
+- **Respostas com IA e fallback local:** integração com modelos da NVIDIA NIM. Se a API falhar, o chatbot responde com textos locais sobre Python, HTML, CSS e SQL.
+- **Processamento em segundo plano:** o módulo `threading` envia as requisições à API sem travar a interface.
 
 ---
 
@@ -23,7 +23,8 @@ Aplicação desktop em Python que simula um chatbot inteligente. O projeto inclu
 
 - **Linguagem:** Python 3.x
 - **Interface gráfica:** CustomTkinter
-- **Integração com IA:** Google GenAI SDK (`google-genai`)
+- **Integração com IA:** OpenAI SDK (`openai`), apontando para a API da NVIDIA NIM
+- **Variáveis de ambiente:** `python-dotenv`
 - **Concorrência:** módulo nativo `threading`
 
 ---
@@ -42,29 +43,53 @@ cd chatBotIA
 Com o Python 3.x instalado, execute no terminal:
 
 ```bash
-pip install customtkinter google-genai
+pip install customtkinter openai python-dotenv
 ```
 
-### 3. Configurar a chave da API (opcional)
+### 3. Obter a chave da API
 
-A chave do Gemini é lida da variável de ambiente `GEMINI_API_KEY`. Sem ela, o chatbot continua funcionando com as respostas locais para temas de TI.
+1. Crie uma conta em [build.nvidia.com](https://build.nvidia.com).
+2. Gere uma chave de API no painel. Ela começa com `nvapi-`.
 
-No PowerShell (Windows):
+### 4. Configurar o arquivo `.env`
 
-```powershell
-$env:GEMINI_API_KEY="SUA_CHAVE_AQUI"
+Crie um arquivo chamado `.env` na raiz do projeto, na mesma pasta do `main.py`, com o conteúdo:
+
+```
+NVIDIA_API_KEY=nvapi-sua-chave-aqui
 ```
 
-No Linux ou macOS:
+> **Importante:** o arquivo `.env` contém sua chave pessoal. Ele já deve estar listado no `.gitignore` para não ser enviado ao GitHub. Nunca escreva a chave diretamente no código.
 
-```bash
-export GEMINI_API_KEY="SUA_CHAVE_AQUI"
-```
-
-### 4. Executar a aplicação
+### 5. Executar a aplicação
 
 ```bash
 python main.py
+```
+
+---
+
+## Modelo utilizado
+
+O modelo está definido na constante `MODELO_IA` no início do `main.py`. Atualmente:
+
+```python
+MODELO_IA = "openai/gpt-oss-20b"
+```
+
+Os modelos disponíveis na NVIDIA NIM mudam com o tempo. Se a aplicação passar a retornar erros `404` ou `410`, o modelo pode ter sido removido do catálogo. Para ver os modelos disponíveis para a sua chave, rode:
+
+```python
+from openai import OpenAI
+import os
+
+client = OpenAI(
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=os.getenv("NVIDIA_API_KEY"),
+)
+
+for m in client.models.list().data:
+    print(m.id)
 ```
 
 ---
@@ -75,5 +100,17 @@ Para entrar na aplicação, use as credenciais padrão:
 
 - **Usuário:** `admin`
 - **Senha:** `1234`
+
+---
+
+## Estrutura do projeto
+
+```
+chatBotIA/
+├── main.py       # Código principal da aplicação
+├── .env          # Chave da API (não versionar)
+├── .gitignore    # Deve conter ao menos: .env
+└── README.md
+```
 
 ---
