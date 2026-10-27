@@ -3,7 +3,11 @@ import time
 import threading
 import customtkinter as ctk
 from tkinter import messagebox
-from google import genai
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Carrega as variáveis do arquivo .env
+load_dotenv()
 
 # Configuração do visual do CustomTkinter
 ctk.set_appearance_mode("Dark")
@@ -13,19 +17,30 @@ ctk.set_default_color_theme("blue")
 USUARIO_CORRETO = "admin"
 SENHA_CORRETA = "1234"
 
+# Modelo testado e disponível para a conta gratuita
+MODELO_IA = "openai/gpt-oss-20b"
+PROMPT_SISTEMA = "Você é um assistente de TI prestativo e educado do SENAI."
+
 
 class AppChatbot(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Chatbot IA - SENAI")
+        self.title("Chatbot IA - SENAI (NVIDIA NIM)")
         self.geometry("500x650")
         self.resizable(False, False)
 
-        # Configuração do Cliente Gemini
-        api_key = os.environ.get("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=api_key)
-        
+        # Cliente NVIDIA NIM (padrão OpenAI). A chave vem do arquivo .env
+        self.client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=os.getenv("NVIDIA_API_KEY"),
+        )
+
+        # Histórico de mensagens para manter o contexto da conversa
+        self.historico_mensagens = [
+            {"role": "system", "content": PROMPT_SISTEMA}
+        ]
+
         # Iniciar na Tela de Login
         self.criar_tela_login()
 
@@ -62,7 +77,7 @@ class AppChatbot(ctk.CTk):
     # 2. TELA PRINCIPAL DO CHAT
     # ==========================================
     def criar_tela_chat(self):
-        # Barra Superior de Controles
+        # Barra superior de controles
         self.frame_topo = ctk.CTkFrame(self, height=40)
         self.frame_topo.pack(fill="x", padx=10, pady=(10, 0))
 
@@ -72,14 +87,17 @@ class AppChatbot(ctk.CTk):
         self.btn_tema = ctk.CTkButton(self.frame_topo, text="Alternar Tema", command=self.alternar_tema, width=120)
         self.btn_tema.pack(side="right", padx=10, pady=5)
 
-        self.btn_limpar = ctk.CTkButton(self.frame_topo, text="Limpar", command=self.limpar_conversa, fg_color="red", hover_color="darkred", width=80)
+        self.btn_limpar = ctk.CTkButton(
+            self.frame_topo, text="Limpar", command=self.limpar_conversa,
+            fg_color="red", hover_color="darkred", width=80
+        )
         self.btn_limpar.pack(side="right", padx=5, pady=5)
 
-        # Caixa de Texto com Scroll para exibir a conversa
+        # Caixa de texto com scroll para exibir a conversa
         self.txt_conversa = ctk.CTkTextbox(self, state="disabled", wrap="word", font=("Arial", 13))
         self.txt_conversa.pack(padx=10, pady=10, fill="both", expand=True)
 
-        # Área de Input e Envio
+        # Área de input e envio
         self.frame_input = ctk.CTkFrame(self)
         self.frame_input.pack(fill="x", padx=10, pady=(0, 10))
 
@@ -90,8 +108,8 @@ class AppChatbot(ctk.CTk):
         self.btn_enviar = ctk.CTkButton(self.frame_input, text="Enviar", command=self.enviar_mensagem, width=90)
         self.btn_enviar.pack(side="right", padx=(5, 10), pady=10)
 
-        # Mensagem Inicial
-        self.exibir_mensagem("IA Chatbot", "Olá! Sou o assistente de TI. Como posso te ajudar hoje?")
+        # Mensagem inicial
+        self.exibir_mensagem("IA Chatbot", "Olá! Sou o assistente de TI via NVIDIA NIM. Como posso te ajudar hoje?")
 
     # ==========================================
     # 3. EXIBIÇÃO E MANIPULAÇÃO DE MENSAGENS
@@ -112,27 +130,27 @@ class AppChatbot(ctk.CTk):
         self.txt_conversa.configure(state="normal")
         self.txt_conversa.delete("1.0", "end")
         self.txt_conversa.configure(state="disabled")
+        # Reinicia o histórico, mantendo apenas a instrução do sistema
+        self.historico_mensagens = [
+            {"role": "system", "content": PROMPT_SISTEMA}
+        ]
 
     # ==========================================
-    # 4. LÓGICA DE RESPOSTA E IA
+    # 4. LÓGICA DE RESPOSTA E IA (NVIDIA)
     # ==========================================
     def enviar_mensagem(self):
         texto_usuario = self.ent_mensagem.get().strip()
         if not texto_usuario:
             return
 
-        # Limpa o campo de entrada e exibe a mensagem do usuário
         self.ent_mensagem.delete(0, "end")
         self.exibir_mensagem("Você", texto_usuario)
 
-        # Usa uma Thread separada para não travar a interface gráfica durante a resposta
         threading.Thread(target=self.processar_resposta, args=(texto_usuario,), daemon=True).start()
 
     def processar_resposta(self, pergunta):
-        # Simula um pequeno atraso (raciocínio da IA)
-        time.sleep(1)
+        time.sleep(0.5)
 
-        # Respostas locais de backup sobre TI
         respostas_locais = {
             "python": "Python é uma linguagem de programação de alto nível, amplamente usada em Data Science, IA e Web.",
             "html": "HTML é a linguagem de marcação padrão para criar páginas web.",
@@ -142,15 +160,31 @@ class AppChatbot(ctk.CTk):
 
         resposta_final = ""
 
-        # Tenta obter resposta da API do Gemini
+        # Adiciona a mensagem do usuário ao histórico
+        self.historico_mensagens.append({"role": "user", "content": pergunta})
+
         try:
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=pergunta
+            response = self.client.chat.completions.create(
+                model=MODELO_IA,
+                messages=self.historico_mensagens,
+                temperature=0.2,
+                top_p=0.7,
+                max_tokens=2048
             )
-            resposta_final = response.text
-        except Exception:
-            # Caso a API falhe ou não haja internet, recorre à resposta condicional local sobre TI
+            resposta_final = response.choices[0].message.content or ""
+
+            if not resposta_final:
+                raise ValueError("A API retornou uma resposta vazia.")
+
+            # Adiciona a resposta da IA ao histórico
+            self.historico_mensagens.append({"role": "assistant", "content": resposta_final})
+
+        except Exception as e:
+            print(f"\n[ERRO DETALHADO DA API NVIDIA]: {e}\n")
+
+            # Remove a pergunta que falhou, para não contaminar o histórico
+            self.historico_mensagens.pop()
+
             pergunta_lower = pergunta.lower()
             for chave, resposta in respostas_locais.items():
                 if chave in pergunta_lower:
@@ -158,13 +192,11 @@ class AppChatbot(ctk.CTk):
                     break
 
             if not resposta_final:
-                resposta_final = "Desculpe, estou temporariamente sem conexão com a IA principal e não encontrei este assunto na minha base local de TI."
+                resposta_final = "Desculpe, ocorreu um erro ao conectar com a API da NVIDIA."
 
-        # Atualiza a interface gráfica com a resposta da IA
         self.after(0, self.exibir_mensagem, "IA Chatbot", resposta_final)
 
 
-# ESSAS LINHAS NO FINAL SÃO OBLIGATÓRIAS PARA ABRIR A JANELA
 if __name__ == "__main__":
     app = AppChatbot()
     app.mainloop()
