@@ -1,0 +1,16 @@
+# Arquivos de cache compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+
+# Configurações do VS Code e IDEs
+.vscode/
+.idea/
+
+# Chaves de API e variáveis de ambiente locais
+.env
